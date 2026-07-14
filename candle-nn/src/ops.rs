@@ -289,6 +289,22 @@ impl candle::CustomOp1 for SoftmaxLastDim {
         "softmax-last-dim"
     }
 
+    /// Softmax backward needs only the op's own output:
+    ///   gx = y * (g - sum(g * y, last_dim, keepdim))
+    /// Upstream ships this op forward-only (silent no-grad); added for Noor
+    /// training — same treatment as PR #3613 gives fused layer_norm.
+    fn bwd(
+        &self,
+        _arg: &Tensor,
+        res: &Tensor,
+        grad_res: &Tensor,
+    ) -> Result<Option<Tensor>> {
+        let d = res.rank() - 1;
+        let sum = (grad_res * res)?.sum_keepdim(d)?;
+        let gx = (res * grad_res.broadcast_sub(&sum)?)?;
+        Ok(Some(gx))
+    }
+
     fn cpu_fwd(&self, storage: &CpuStorage, layout: &Layout) -> Result<(CpuStorage, Shape)> {
         fn softmax<T: candle::WithDType + num_traits::Float>(
             src: &[T],
