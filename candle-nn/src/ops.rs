@@ -451,7 +451,9 @@ impl candle::CustomOp1 for SoftmaxLastDim {
 }
 
 pub fn softmax_last_dim(xs: &Tensor) -> Result<Tensor> {
-    xs.apply_op1_no_bwd(&SoftmaxLastDim)
+    // apply_op1 (NOT apply_op1_no_bwd): registers the op in the autograd
+    // graph so the bwd added above actually runs during training.
+    xs.apply_op1(SoftmaxLastDim)
 }
 
 #[derive(Debug, Clone)]
